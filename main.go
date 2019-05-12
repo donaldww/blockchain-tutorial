@@ -27,7 +27,7 @@ type Block struct {
 }
 
 // Blockchain is a series of validated Blocks
-var Blockchain []Block
+var blockchain []Block
 
 // Message takes incoming JSON payload for writing heart rate
 type Message struct {
@@ -49,7 +49,7 @@ func main() {
 		spew.Dump(genesisBlock)
 
 		mutex.Lock()
-		Blockchain = append(Blockchain, genesisBlock)
+		blockchain = append(blockchain, genesisBlock)
 		mutex.Unlock()
 	}()
 	log.Fatal(run())
@@ -58,12 +58,12 @@ func main() {
 
 // web server
 func run() error {
-	mux := makeMuxRouter()
+	thisMux := makeMuxRouter()
 	httpPort := os.Getenv("PORT")
 	log.Println("HTTP Server Listening on port :", httpPort)
 	s := &http.Server{
 		Addr:           ":" + httpPort,
-		Handler:        mux,
+		Handler:        thisMux,
 		ReadTimeout:    10 * time.Second,
 		WriteTimeout:   10 * time.Second,
 		MaxHeaderBytes: 1 << 20,
@@ -85,13 +85,13 @@ func makeMuxRouter() http.Handler {
 }
 
 // write blockchain when we receive an http request
-func handleGetBlockchain(w http.ResponseWriter, r *http.Request) {
-	bytes, err := json.MarshalIndent(Blockchain, "", "  ")
+func handleGetBlockchain(w http.ResponseWriter, _ *http.Request) {
+	bytes, err := json.MarshalIndent(blockchain, "", "  ")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	io.WriteString(w, string(bytes))
+	_, _ = io.WriteString(w, string(bytes))
 }
 
 // takes JSON payload as an input for heart rate (BPM)
@@ -107,12 +107,12 @@ func handleWriteBlock(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	mutex.Lock()
-	prevBlock := Blockchain[len(Blockchain)-1]
+	prevBlock := blockchain[len(blockchain)-1]
 	newBlock := generateBlock(prevBlock, msg.BPM)
 
 	if isBlockValid(newBlock, prevBlock) {
-		Blockchain = append(Blockchain, newBlock)
-		spew.Dump(Blockchain)
+		blockchain = append(blockchain, newBlock)
+		spew.Dump(blockchain)
 	}
 	mutex.Unlock()
 
@@ -120,15 +120,15 @@ func handleWriteBlock(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func respondWithJSON(w http.ResponseWriter, r *http.Request, code int, payload interface{}) {
+func respondWithJSON(w http.ResponseWriter, _ *http.Request, code int, payload interface{}) {
 	response, err := json.MarshalIndent(payload, "", "  ")
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("HTTP 500: Internal Server Error"))
+		_, _ = w.Write([]byte("HTTP 500: Internal Server Error"))
 		return
 	}
 	w.WriteHeader(code)
-	w.Write(response)
+	_, _ = w.Write(response)
 }
 
 // make sure block is valid by checking index, and comparing the hash of the previous block

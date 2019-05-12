@@ -30,7 +30,7 @@ type Block struct {
 }
 
 // Blockchain is a series of validated Blocks
-var Blockchain []Block
+var blockchain []Block
 var tempBlocks []Block
 
 // candidateBlocks handles incoming blocks for validation
@@ -55,7 +55,7 @@ func main() {
 	genesisBlock := Block{}
 	genesisBlock = Block{0, t.String(), 0, calculateBlockHash(genesisBlock), "", ""}
 	spew.Dump(genesisBlock)
-	Blockchain = append(Blockchain, genesisBlock)
+	blockchain = append(blockchain, genesisBlock)
 
 	httpPort := os.Getenv("PORT")
 
@@ -82,9 +82,9 @@ func main() {
 	}()
 
 	for {
-		conn, err := server.Accept()
-		if err != nil {
-			log.Fatal(err)
+		conn, thisErr := server.Accept()
+		if thisErr != nil {
+			log.Fatal(thisErr)
 		}
 		go handleConn(conn)
 	}
@@ -98,7 +98,7 @@ func pickWinner() {
 	temp := tempBlocks
 	mutex.Unlock()
 
-	lotteryPool := []string{}
+	var lotteryPool []string
 	if len(temp) > 0 {
 
 		// slightly modified traditional proof of stake algorithm
@@ -135,9 +135,9 @@ func pickWinner() {
 		for _, block := range temp {
 			if block.Validator == lotteryWinner {
 				mutex.Lock()
-				Blockchain = append(Blockchain, block)
+				blockchain = append(blockchain, block)
 				mutex.Unlock()
-				for _ = range validators {
+				for range validators {
 					announcements <- "\nwinning validator: " + lotteryWinner + "\n"
 				}
 				break
@@ -156,7 +156,7 @@ func handleConn(conn net.Conn) {
 	go func() {
 		for {
 			msg := <-announcements
-			io.WriteString(conn, msg)
+			_, _ = io.WriteString(conn, msg)
 		}
 	}()
 	// validator address
@@ -164,7 +164,7 @@ func handleConn(conn net.Conn) {
 
 	// allow user to allocate number of tokens to stake
 	// the greater the number of tokens, the greater chance to forging a new block
-	io.WriteString(conn, "Enter token balance:")
+	_, _ = io.WriteString(conn, "Enter token balance:")
 	scanBalance := bufio.NewScanner(conn)
 	for scanBalance.Scan() {
 		balance, err := strconv.Atoi(scanBalance.Text())
@@ -179,7 +179,7 @@ func handleConn(conn net.Conn) {
 		break
 	}
 
-	io.WriteString(conn, "\nEnter a new BPM:")
+	_, _ = io.WriteString(conn, "\nEnter a new BPM:")
 
 	scanBPM := bufio.NewScanner(conn)
 
@@ -196,7 +196,7 @@ func handleConn(conn net.Conn) {
 				}
 
 				mutex.Lock()
-				oldLastIndex := Blockchain[len(Blockchain)-1]
+				oldLastIndex := blockchain[len(blockchain)-1]
 				mutex.Unlock()
 
 				// create newBlock for consideration to be forged
@@ -208,7 +208,7 @@ func handleConn(conn net.Conn) {
 				if isBlockValid(newBlock, oldLastIndex) {
 					candidateBlocks <- newBlock
 				}
-				io.WriteString(conn, "\nEnter a new BPM:")
+				_, _ = io.WriteString(conn, "\nEnter a new BPM:")
 			}
 		}
 	}()
@@ -217,12 +217,12 @@ func handleConn(conn net.Conn) {
 	for {
 		time.Sleep(time.Minute)
 		mutex.Lock()
-		output, err := json.Marshal(Blockchain)
+		output, err := json.Marshal(blockchain)
 		mutex.Unlock()
 		if err != nil {
 			log.Fatal(err)
 		}
-		io.WriteString(conn, string(output)+"\n")
+		_, _ = io.WriteString(conn, string(output)+"\n")
 	}
 
 }
@@ -254,7 +254,7 @@ func calculateHash(s string) string {
 	return hex.EncodeToString(hashed)
 }
 
-//calculateBlockHash returns the hash of all block information
+// calculateBlockHash returns the hash of all block information
 func calculateBlockHash(block Block) string {
 	record := string(block.Index) + block.Timestamp + string(block.BPM) + block.PrevHash
 	return calculateHash(record)

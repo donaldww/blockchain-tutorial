@@ -27,7 +27,7 @@ type Block struct {
 }
 
 // Blockchain is a series of validated Blocks
-var Blockchain []Block
+var blockchain []Block
 
 // bcServer handles incoming concurrent Blocks
 var bcServer chan []Block
@@ -45,7 +45,7 @@ func main() {
 	t := time.Now()
 	genesisBlock := Block{0, t.String(), 0, "", ""}
 	spew.Dump(genesisBlock)
-	Blockchain = append(Blockchain, genesisBlock)
+	blockchain = append(blockchain, genesisBlock)
 
 	httpPort := os.Getenv("PORT")
 
@@ -58,9 +58,9 @@ func main() {
 	defer server.Close()
 
 	for {
-		conn, err := server.Accept()
-		if err != nil {
-			log.Fatal(err)
+		conn, thisErr := server.Accept()
+		if thisErr != nil {
+			log.Fatal(thisErr)
 		}
 		go handleConn(conn)
 	}
@@ -71,7 +71,7 @@ func handleConn(conn net.Conn) {
 
 	defer conn.Close()
 
-	io.WriteString(conn, "Enter a new BPM:")
+	_, _ = io.WriteString(conn, "Enter a new BPM:")
 
 	scanner := bufio.NewScanner(conn)
 
@@ -83,18 +83,18 @@ func handleConn(conn net.Conn) {
 				log.Printf("%v not a number: %v", scanner.Text(), err)
 				continue
 			}
-			newBlock, err := generateBlock(Blockchain[len(Blockchain)-1], bpm)
+			newBlock, err := generateBlock(blockchain[len(blockchain)-1], bpm)
 			if err != nil {
 				log.Println(err)
 				continue
 			}
-			if isBlockValid(newBlock, Blockchain[len(Blockchain)-1]) {
-				newBlockchain := append(Blockchain, newBlock)
+			if isBlockValid(newBlock, blockchain[len(blockchain)-1]) {
+				newBlockchain := append(blockchain, newBlock)
 				replaceChain(newBlockchain)
 			}
 
-			bcServer <- Blockchain
-			io.WriteString(conn, "\nEnter a new BPM:")
+			bcServer <- blockchain
+			_, _ = io.WriteString(conn, "\nEnter a new BPM:")
 		}
 	}()
 
@@ -103,17 +103,17 @@ func handleConn(conn net.Conn) {
 		for {
 			time.Sleep(30 * time.Second)
 			mutex.Lock()
-			output, err := json.Marshal(Blockchain)
+			output, err := json.Marshal(blockchain)
 			if err != nil {
 				log.Fatal(err)
 			}
 			mutex.Unlock()
-			io.WriteString(conn, string(output))
+			_, _ = io.WriteString(conn, string(output))
 		}
 	}()
 
-	for _ = range bcServer {
-		spew.Dump(Blockchain)
+	for range bcServer {
+		spew.Dump(blockchain)
 	}
 
 }
@@ -138,8 +138,8 @@ func isBlockValid(newBlock, oldBlock Block) bool {
 // make sure the chain we're checking is longer than the current blockchain
 func replaceChain(newBlocks []Block) {
 	mutex.Lock()
-	if len(newBlocks) > len(Blockchain) {
-		Blockchain = newBlocks
+	if len(newBlocks) > len(blockchain) {
+		blockchain = newBlocks
 	}
 	mutex.Unlock()
 }

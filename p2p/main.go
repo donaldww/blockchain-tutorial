@@ -20,7 +20,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	golog "github.com/ipfs/go-log"
-	libp2p "github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p"
 	crypto "github.com/libp2p/go-libp2p-crypto"
 	host "github.com/libp2p/go-libp2p-host"
 	net "github.com/libp2p/go-libp2p-net"
@@ -40,7 +40,7 @@ type Block struct {
 }
 
 // Blockchain is a series of validated Blocks
-var Blockchain []Block
+var blockchain []Block
 
 var mutex = &sync.Mutex{}
 
@@ -127,17 +127,16 @@ func readData(rw *bufio.ReadWriter) {
 		if str != "\n" {
 
 			chain := make([]Block, 0)
-			if err := json.Unmarshal([]byte(str), &chain); err != nil {
-				log.Fatal(err)
+			if thisErr := json.Unmarshal([]byte(str), &chain); thisErr != nil {
+				log.Fatal(thisErr)
 			}
 
 			mutex.Lock()
-			if len(chain) > len(Blockchain) {
-				Blockchain = chain
-				bytes, err := json.MarshalIndent(Blockchain, "", "  ")
-				if err != nil {
-
-					log.Fatal(err)
+			if len(chain) > len(blockchain) {
+				blockchain = chain
+				bytes, thisErr := json.MarshalIndent(blockchain, "", "  ")
+				if thisErr != nil {
+					log.Fatal(thisErr)
 				}
 				// Green console color: 	\x1b[32m
 				// Reset console color: 	\x1b[0m
@@ -149,20 +148,19 @@ func readData(rw *bufio.ReadWriter) {
 }
 
 func writeData(rw *bufio.ReadWriter) {
-
 	go func() {
 		for {
 			time.Sleep(5 * time.Second)
 			mutex.Lock()
-			bytes, err := json.Marshal(Blockchain)
+			bytes, err := json.Marshal(blockchain)
 			if err != nil {
 				log.Println(err)
 			}
 			mutex.Unlock()
 
 			mutex.Lock()
-			rw.WriteString(fmt.Sprintf("%s\n", string(bytes)))
-			rw.Flush()
+			_, _ = rw.WriteString(fmt.Sprintf("%s\n", string(bytes)))
+			_ = rw.Flush()
 			mutex.Unlock()
 
 		}
@@ -182,24 +180,24 @@ func writeData(rw *bufio.ReadWriter) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		newBlock := generateBlock(Blockchain[len(Blockchain)-1], bpm)
+		newBlock := generateBlock(blockchain[len(blockchain)-1], bpm)
 
-		if isBlockValid(newBlock, Blockchain[len(Blockchain)-1]) {
+		if isBlockValid(newBlock, blockchain[len(blockchain)-1]) {
 			mutex.Lock()
-			Blockchain = append(Blockchain, newBlock)
+			blockchain = append(blockchain, newBlock)
 			mutex.Unlock()
 		}
 
-		bytes, err := json.Marshal(Blockchain)
+		bytes, err := json.Marshal(blockchain)
 		if err != nil {
 			log.Println(err)
 		}
 
-		spew.Dump(Blockchain)
+		spew.Dump(blockchain)
 
 		mutex.Lock()
-		rw.WriteString(fmt.Sprintf("%s\n", string(bytes)))
-		rw.Flush()
+		_, _ = rw.WriteString(fmt.Sprintf("%s\n", string(bytes)))
+		_ = rw.Flush()
 		mutex.Unlock()
 	}
 
@@ -210,7 +208,7 @@ func main() {
 	genesisBlock := Block{}
 	genesisBlock = Block{0, t.String(), 0, calculateHash(genesisBlock), ""}
 
-	Blockchain = append(Blockchain, genesisBlock)
+	blockchain = append(blockchain, genesisBlock)
 
 	// LibP2P code uses golog to log messages. They log with different
 	// string IDs (i.e. "swarm"). We can control the verbosity level for
@@ -247,19 +245,19 @@ func main() {
 
 		// The following code extracts target's peer ID from the
 		// given multiaddress
-		ipfsaddr, err := ma.NewMultiaddr(*target)
-		if err != nil {
-			log.Fatalln(err)
+		ipfsaddr, thisErr := ma.NewMultiaddr(*target)
+		if thisErr != nil {
+			log.Fatalln(thisErr)
 		}
 
-		pid, err := ipfsaddr.ValueForProtocol(ma.P_IPFS)
-		if err != nil {
-			log.Fatalln(err)
+		pid, thisErr := ipfsaddr.ValueForProtocol(ma.P_IPFS)
+		if thisErr != nil {
+			log.Fatalln(thisErr)
 		}
 
-		peerid, err := peer.IDB58Decode(pid)
-		if err != nil {
-			log.Fatalln(err)
+		peerid, thisErr := peer.IDB58Decode(pid)
+		if thisErr != nil {
+			log.Fatalln(thisErr)
 		}
 
 		// Decapsulate the /ipfs/<peerID> part from the target
@@ -276,9 +274,9 @@ func main() {
 		// make a new stream from host B to host A
 		// it should be handled on host A by the handler we set above because
 		// we use the same /p2p/1.0.0 protocol
-		s, err := ha.NewStream(context.Background(), peerid, "/p2p/1.0.0")
-		if err != nil {
-			log.Fatalln(err)
+		s, thisErr := ha.NewStream(context.Background(), peerid, "/p2p/1.0.0")
+		if thisErr != nil {
+			log.Fatalln(thisErr)
 		}
 		// Create a buffered stream so that read and writes are non blocking.
 		rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
